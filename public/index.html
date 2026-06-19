@@ -237,12 +237,20 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <!-- MC page -->
     <div id="pg-devops" style="display:none">
       <div style="padding:14px">
+        <!-- Import banner -->
+        <div style="background:#0d1c3a;border:1px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:14px">
+          <div style="font-size:14px;font-weight:600;color:#60a5fa;margin-bottom:4px">Import from Azure DevOps</div>
+          <div style="font-size:12px;color:#9ba3bd;margin-bottom:12px;line-height:1.6">Pulls ALL work items from <strong style="color:#e8eaf2">ksec-devops / Ksec-Backoffice</strong> and replaces tracker projects automatically. Maker-checker is auto-analysed per item.</div>
+          <button onclick="importFromADO()" id="import-btn" style="width:100%;padding:12px;background:#3b82f6;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+            Import all work items from Azure DevOps
+          </button>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <button onclick="loadADO()" style="flex:1;padding:10px;background:#1e2330;border:1px solid #2d3448;border-radius:8px;color:#e8eaf2;font-size:13px;cursor:pointer;font-family:inherit">
-            Fetch from Azure DevOps
+            Preview work items
           </button>
           <button onclick="syncADO()" style="flex:1;padding:10px;background:#1e0d3a;border:1px solid #a855f7;border-radius:8px;color:#c084fc;font-size:13px;cursor:pointer;font-family:inherit">
-            Sync status to tracker
+            Sync status updates
           </button>
         </div>
         <div id="ado-status" style="font-size:12px;color:#5c6480;margin-bottom:10px;padding:8px 12px;background:#1e2330;border-radius:8px;display:none"></div>
@@ -1009,6 +1017,51 @@ async function saveNewProject() {
     errEl.style.display = 'block';
   } finally {
     btn.textContent = 'Save to Supabase';
+    btn.disabled = false;
+  }
+}
+
+// ── Import all from ADO ───────────────────────────────────────────────────────
+async function importFromADO() {
+  const btn    = document.getElementById('import-btn');
+  const status = document.getElementById('ado-status');
+  status.style.display   = 'block';
+  status.style.color     = 'var(--bt)';
+  status.textContent     = 'Connecting to Azure DevOps ksec-devops/Ksec-Backoffice...';
+  btn.disabled           = true;
+  btn.textContent        = 'Importing...';
+
+  try {
+    const res  = await fetch('/api/devops/import', { method: 'POST' });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Import failed');
+
+    status.style.color = 'var(--gt)';
+    status.textContent = `✅ ${data.message}`;
+    btn.textContent    = `✅ Imported ${data.imported} projects`;
+
+    // Reload all projects from Supabase
+    await load();
+
+    // Update counts
+    document.getElementById('nc') && (document.getElementById('nc').textContent = all.length);
+    document.getElementById('total-badge') && (document.getElementById('total-badge').textContent = all.length);
+    document.getElementById('fc') && (document.getElementById('fc').textContent = all.length + ' projects from Azure DevOps');
+    document.getElementById('ado-badge').textContent  = all.length;
+    document.getElementById('ado-badge').style.display = '';
+
+    toast(`Imported ${data.imported} projects from Azure DevOps!`, 'ok');
+
+    // Refresh ADO cards
+    await loadADO();
+
+  } catch(e) {
+    status.style.color = 'var(--rt)';
+    status.textContent = 'Error: ' + e.message;
+    btn.textContent    = 'Retry import';
+    toast('Import failed: ' + e.message.slice(0,60), 'err');
+  } finally {
     btn.disabled = false;
   }
 }
