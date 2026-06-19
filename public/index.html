@@ -209,8 +209,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       </div>
       <div class="topbar-right">
         <div class="db-pill"><div class="db-dot" id="db-dot"></div><span id="db-txt">...</span></div>
-        <button onclick="load()" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:4px">
+        <button onclick="load()" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:4px" title="Refresh">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+        <button onclick="openAddProject()" style="background:#3b82f6;border:none;color:#fff;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:5px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add
         </button>
       </div>
     </div>
@@ -280,6 +284,73 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <div class="sheet-handle"></div>
   <div class="sheet-hdr"><h2 id="sheet-title"></h2></div>
   <div class="sheet-body" id="sheet-body"></div>
+</div>
+
+<!-- Add Project Sheet -->
+<div class="sheet-bg" id="add-sheet-bg" onclick="closeAddProject()"></div>
+<div class="sheet" id="add-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-hdr">
+    <h2>Add new project</h2>
+  </div>
+  <div class="sheet-body">
+    <div class="fg"><label>Project name *</label><input type="text" id="ap-name" placeholder="e.g. Risk EOD Automation"></div>
+    <div class="fg"><label>Category *</label>
+      <select id="ap-cat">
+        <option value="Automation">Automation</option>
+        <option value="Development">Development</option>
+        <option value="Infrastructure">Infrastructure</option>
+        <option value="Data Reconciliation/Migration">Data Reconciliation/Migration</option>
+        <option value="Standardization">Standardization</option>
+      </select>
+    </div>
+    <div class="fg"><label>Status *</label>
+      <select id="ap-stat">
+        <option value="In Progress">In Progress</option>
+        <option value="Requirement Gathering">Requirement Gathering</option>
+        <option value="Live">Live</option>
+        <option value="Blocked">Blocked</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Dev Complete">Dev Complete</option>
+        <option value="UAT">UAT</option>
+        <option value="Waiting">Waiting</option>
+        <option value="Pending">Pending</option>
+      </select>
+    </div>
+    <div class="fg"><label>RAG</label>
+      <select id="ap-rag">
+        <option value="G">Green</option>
+        <option value="A">Amber</option>
+        <option value="R">Red</option>
+      </select>
+    </div>
+    <div class="fg"><label>Priority</label>
+      <select id="ap-pri">
+        <option value="">—</option>
+        <option value="P1">P1</option>
+        <option value="P2">P2</option>
+        <option value="P3">P3</option>
+      </select>
+    </div>
+    <div class="fg"><label>Owner</label><input type="text" id="ap-owner" placeholder="e.g. Abhishek Bhagat"></div>
+    <div class="fg"><label>Technology</label><input type="text" id="ap-tech" placeholder="e.g. Python, Power Automate"></div>
+    <div class="fg"><label>Maker-Checker required?</label>
+      <select id="ap-mc">
+        <option value="No">No</option>
+        <option value="Yes">Yes</option>
+        <option value="Partial">Partial</option>
+      </select>
+    </div>
+    <div class="fg"><label>MC Reason</label><textarea id="ap-mcreason" placeholder="Why is maker-checker required or not?"></textarea></div>
+    <div class="fg"><label>Current status / notes</label><textarea id="ap-status" placeholder="What is happening with this project?"></textarea></div>
+    <div class="fg"><label>Blocker (if any)</label><input type="text" id="ap-blocker" placeholder="e.g. Waiting for API access"></div>
+    <div class="fg"><label>ETA</label><input type="text" id="ap-eta" placeholder="e.g. 2026-07-15"></div>
+    <div class="btn-row">
+      <button class="btn" style="background:var(--bg3);color:var(--text);border:1px solid var(--border)" onclick="closeAddProject()">Cancel</button>
+      <button class="btn blue" id="ap-save-btn" onclick="saveNewProject()">Save to Supabase</button>
+    </div>
+    <div id="ap-error" style="font-size:12px;color:var(--rt);margin-top:8px;display:none"></div>
+  </div>
 </div>
 
 <!-- Delete modal -->
@@ -854,6 +925,91 @@ function nav(p) {
     });
     document.getElementById('content').scrollTop = 0;
     curPage = 'devops';
+  }
+}
+
+// ── Add Project ───────────────────────────────────────────────────────────────
+function openAddProject() {
+  // Reset form
+  ['ap-name','ap-owner','ap-tech','ap-blocker','ap-eta','ap-mcreason','ap-status'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('ap-cat').value   = 'Automation';
+  document.getElementById('ap-stat').value  = 'In Progress';
+  document.getElementById('ap-rag').value   = 'G';
+  document.getElementById('ap-pri').value   = '';
+  document.getElementById('ap-mc').value    = 'No';
+  document.getElementById('ap-error').style.display = 'none';
+  document.getElementById('add-sheet-bg').classList.add('open');
+  document.getElementById('add-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('ap-name').focus(), 300);
+}
+
+function closeAddProject() {
+  document.getElementById('add-sheet-bg').classList.remove('open');
+  document.getElementById('add-sheet').classList.remove('open');
+}
+
+async function saveNewProject() {
+  const name = document.getElementById('ap-name').value.trim();
+  const errEl = document.getElementById('ap-error');
+  errEl.style.display = 'none';
+
+  if (!name) {
+    errEl.textContent = 'Project name is required.';
+    errEl.style.display = 'block';
+    document.getElementById('ap-name').focus();
+    return;
+  }
+
+  const btn = document.getElementById('ap-save-btn');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  const project = {
+    project:        name,
+    category:       document.getElementById('ap-cat').value,
+    status:         document.getElementById('ap-stat').value,
+    rag:            document.getElementById('ap-rag').value,
+    priority:       document.getElementById('ap-pri').value,
+    owner:          document.getElementById('ap-owner').value.trim(),
+    tech:           document.getElementById('ap-tech').value.trim(),
+    mc:             document.getElementById('ap-mc').value,
+    mc_reason:      document.getElementById('ap-mcreason').value.trim(),
+    current_status: document.getElementById('ap-status').value.trim(),
+    blocker:        document.getElementById('ap-blocker').value.trim(),
+    eta:            document.getElementById('ap-eta').value.trim(),
+    spoc:           '',
+  };
+
+  try {
+    const r = await fetch(SUPABASE_URL + '/projects', {
+      method: 'POST',
+      headers: { ...SB_HDR, 'Prefer': 'return=representation' },
+      body: JSON.stringify(project)
+    });
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error(err);
+    }
+    const saved = await r.json();
+    // Add to local state immediately
+    all.push(Array.isArray(saved) ? saved[0] : saved);
+    localStorage.setItem('ah_cache', JSON.stringify(all));
+    closeAddProject();
+    render();
+    // Update counts
+    document.getElementById('nc') && (document.getElementById('nc').textContent = all.length);
+    document.getElementById('total-badge') && (document.getElementById('total-badge').textContent = all.length);
+    document.getElementById('fc') && (document.getElementById('fc').textContent = all.length + ' projects in Supabase');
+    toast('Project added! Total: ' + all.length, 'ok');
+  } catch(e) {
+    errEl.textContent = 'Save failed: ' + (e.message || 'Unknown error');
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'Save to Supabase';
+    btn.disabled = false;
   }
 }
 
