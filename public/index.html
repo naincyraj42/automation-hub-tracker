@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="AutoHub">
 <meta name="description" content="Enterprise Automation Hub Project Tracker">
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <title>AutoHub — Project Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -158,6 +160,20 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .toast.ok{background:var(--gbg);color:var(--gt);border-color:var(--green)}
 .toast.err{background:var(--rbg);color:var(--rt);border-color:var(--red)}
 
+/* ADO */
+.ado-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px}
+.ado-card.linked{border-left:3px solid #a855f7}
+.ado-title{font-size:13px;font-weight:500;margin-bottom:6px}
+.ado-meta{font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.ado-state{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px}
+.ado-Active,.ado-InProgress{background:var(--bbg);color:var(--bt)}
+.ado-New{background:var(--bg3);color:var(--text2)}
+.ado-Resolved{background:var(--pbg);color:var(--pt)}
+.ado-Blocked{background:var(--rbg);color:var(--rt)}
+.ado-Done,.ado-Closed{background:var(--gbg);color:var(--gt)}
+.ado-link-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--text2);cursor:pointer;font-family:inherit}
+.ado-link-btn:active{background:var(--bg3)}
+.ado-linked-tag{font-size:11px;color:#c084fc;background:var(--pbg);padding:2px 8px;border-radius:4px}
 /* Loading */
 #load{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:14px}
 .spin{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
@@ -178,7 +194,18 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <div class="offline-bar" id="offline-bar">⚡ Offline mode — showing cached data</div>
     <div class="topbar">
       <div class="topbar-left">
+        <div style="display:flex;align-items:center;gap:8px">
+        <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+          <rect width="100" height="100" rx="20" fill="#0f1117"/>
+          <polygon points="50,12 22,62 31,62 38,46 62,46 69,62 78,62" fill="#3b82f6"/>
+          <rect x="33" y="42" width="34" height="8" fill="#3b82f6"/>
+          <rect x="22" y="62" width="12" height="26" fill="#60a5fa"/>
+          <rect x="22" y="72" width="32" height="8" fill="#60a5fa"/>
+          <rect x="42" y="62" width="12" height="26" fill="#60a5fa"/>
+          <circle cx="80" cy="18" r="8" fill="#3b82f6"/>
+        </svg>
         <div class="logo">Auto<em>Hub</em></div>
+      </div>
       </div>
       <div class="topbar-right">
         <div class="db-pill"><div class="db-dot" id="db-dot"></div><span id="db-txt">...</span></div>
@@ -204,6 +231,20 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <!-- Summary page -->
     <div id="pg-summary" style="display:none"><div class="sum-page" id="sum-page"></div></div>
     <!-- MC page -->
+    <div id="pg-devops" style="display:none">
+      <div style="padding:14px">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button onclick="loadADO()" style="flex:1;padding:10px;background:#1e2330;border:1px solid #2d3448;border-radius:8px;color:#e8eaf2;font-size:13px;cursor:pointer;font-family:inherit">
+            Fetch from Azure DevOps
+          </button>
+          <button onclick="syncADO()" style="flex:1;padding:10px;background:#1e0d3a;border:1px solid #a855f7;border-radius:8px;color:#c084fc;font-size:13px;cursor:pointer;font-family:inherit">
+            Sync status to tracker
+          </button>
+        </div>
+        <div id="ado-status" style="font-size:12px;color:#5c6480;margin-bottom:10px;padding:8px 12px;background:#1e2330;border-radius:8px;display:none"></div>
+        <div id="ado-cards" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
     <div id="pg-mc" style="display:none">
       <div class="metrics" id="mc-metrics"></div>
       <div class="cards" id="mc-cards" style="padding:0 14px 14px"></div>
@@ -702,6 +743,120 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+// ── Azure DevOps ──────────────────────────────────────────────────────────────
+let adoItems = [];
+
+async function loadADO() {
+  const status = document.getElementById('ado-status');
+  const cards  = document.getElementById('ado-cards');
+  status.style.display = 'block';
+  status.textContent = 'Fetching work items from Azure DevOps...';
+  cards.innerHTML = '';
+  try {
+    const res = await fetch('/api/devops/workitems');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    adoItems = data.items || [];
+    status.textContent = `${adoItems.length} work items fetched from ksec-devops / Ksec-Backoffice`;
+    document.getElementById('ado-badge').textContent = adoItems.length;
+    document.getElementById('ado-badge').style.display = adoItems.length ? '' : 'none';
+    renderADOCards();
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    status.style.color = 'var(--rt)';
+  }
+}
+
+async function syncADO() {
+  const status = document.getElementById('ado-status');
+  status.style.display = 'block';
+  status.textContent = 'Syncing Azure DevOps status to tracker...';
+  try {
+    const res  = await fetch('/api/devops/sync', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    status.textContent = data.message;
+    await load();
+    toast(data.message, 'ok');
+  } catch(e) {
+    status.textContent = 'Sync error: ' + e.message;
+    toast('Sync failed: ' + e.message, 'err');
+  }
+}
+
+async function linkADOItem(projectId, workItemId, workItemTitle) {
+  try {
+    const res = await fetch('/api/devops/workitems', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, work_item_id: workItemId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    toast(`Linked to ADO #${workItemId}: ${workItemTitle.slice(0,40)}`, 'ok');
+    await load();
+    renderADOCards();
+  } catch(e) {
+    toast('Link failed: ' + e.message, 'err');
+  }
+}
+
+function renderADOCards() {
+  if (!adoItems.length) {
+    document.getElementById('ado-cards').innerHTML = '<div class="empty">No work items. Click "Fetch from Azure DevOps" above.</div>';
+    return;
+  }
+  const linkedIds = new Set(all.filter(p => p.ado_work_item_id).map(p => p.ado_work_item_id));
+  document.getElementById('ado-cards').innerHTML = adoItems.map(item => {
+    const stCls = 'ado-' + (item.state || '').replace(/\s/g, '');
+    const isLinked = linkedIds.has(item.id);
+    const linkedProject = all.find(p => p.ado_work_item_id === item.id);
+    return `<div class="ado-card ${isLinked ? 'linked' : ''}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <div class="ado-title">#${item.id} — ${item.title}</div>
+        <span class="ado-state ${stCls}">${item.state}</span>
+      </div>
+      <div class="ado-meta">
+        <span>${item.type}</span>
+        ${item.assignee ? '<span>' + item.assignee + '</span>' : ''}
+        ${item.iteration ? '<span>' + item.iteration.split('\\').pop() + '</span>' : ''}
+        ${item.priority ? '<span>P' + item.priority + '</span>' : ''}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <a href="${item.url}" style="font-size:11px;color:var(--bt);text-decoration:none" target="_blank">View in Azure DevOps</a>
+        ${isLinked
+          ? '<span class="ado-linked-tag">Linked to: ' + (linkedProject?.project?.slice(0,35) || '') + '</span>'
+          : '<div style="display:flex;gap:6px;align-items:center"><select id="link-proj-' + item.id + '" style="font-size:11px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text2);max-width:160px"><option value="">Select project…</option>' +
+            all.map(p => '<option value="' + p.id + '">' + p.project.slice(0,40) + '</option>').join('') +
+            '</select><button class="ado-link-btn" onclick="linkFromSelect(' + item.id + ', '' + item.title.replace(/'/g, "\'").slice(0,40) + '')">Link</button></div>'
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function linkFromSelect(workItemId, title) {
+  const sel = document.getElementById('link-proj-' + workItemId);
+  if (!sel || !sel.value) { toast('Select a project first', 'err'); return; }
+  linkADOItem(parseInt(sel.value), workItemId, title);
+}
+
+// Patch nav() to handle devops
+const _origNav = nav;
+function nav(p) {
+  document.getElementById('pg-devops')?.style && (document.getElementById('pg-devops').style.display = p === 'devops' ? '' : 'none');
+  document.getElementById('n-devops')?.classList.toggle('on', p === 'devops');
+  if (p !== 'devops') _origNav(p);
+  else {
+    ['projects','charts','summary','mc'].forEach(x => {
+      document.getElementById('pg-' + x).style.display = 'none';
+      document.getElementById('n-' + x)?.classList.remove('on');
+    });
+    document.getElementById('content').scrollTop = 0;
+    curPage = 'devops';
+  }
+}
+
 async function boot() {
   await load();
   document.getElementById('load').style.display = 'none';
@@ -711,3 +866,4 @@ boot();
 </script>
 </body>
 </html>
+<!-- ADO PATCH APPLIED VIA SEPARATE JS -->
